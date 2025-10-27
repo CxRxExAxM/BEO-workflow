@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -14,6 +14,7 @@ import json
 import uuid
 import os
 from pathlib import Path
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Import database components
 from database import get_db, init_db, THUMBNAILS_DIR, HIGH_RES_DIR, ORIGINALS_DIR
@@ -21,31 +22,35 @@ from models import BEO, BEOPage, Annotation
 
 app = FastAPI(title="Catering Workflow API - Database Edition")
 
-# CORS middleware - allow all origins (can restrict later with specific domains)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now
-    allow_credentials=False,  # Must be False when allow_origins is "*"
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
-)
 
+# Custom CORS middleware to handle all requests
+class CustomCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Handle preflight OPTIONS requests
+        if request.method == "OPTIONS":
+            return JSONResponse(
+                content={},
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "600",
+                }
+            )
 
-# Add OPTIONS handler for all routes to handle CORS preflight
-@app.options("/{full_path:path}")
-async def options_handler():
-    """Handle CORS preflight requests with proper CORS headers"""
-    return JSONResponse(
-        content={},
-        status_code=200,
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Max-Age": "600",
-        }
-    )
+        # Process the actual request
+        response = await call_next(request)
+
+        # Add CORS headers to all responses
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+
+        return response
+
+# Add custom CORS middleware
+app.add_middleware(CustomCORSMiddleware)
 
 
 # Initialize database on startup
@@ -979,11 +984,12 @@ app.mount("/storage/originals", StaticFiles(directory=str(ORIGINALS_DIR)), name=
 
 if FRONTEND_BUILD_DIR.exists():
     # Serve index.html for the root and any other routes (SPA catch-all)
+    # IMPORTANT: This must NOT match /api/* or /storage/* routes
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
-        # If it's an API route, let FastAPI handle it normally
-        if full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="API endpoint not found")
+        # Exclude API and storage routes from catch-all
+        if full_path.startswith("api/") or full_path.startswith("storage/"):
+            raise HTTPException(status_code=404, detail="Not found")
 
         # For all other routes, serve index.html (React Router will handle it)
         index_path = FRONTEND_BUILD_DIR / "index.html"
