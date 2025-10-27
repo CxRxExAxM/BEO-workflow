@@ -20,16 +20,11 @@ from database import get_db, init_db, THUMBNAILS_DIR, HIGH_RES_DIR, ORIGINALS_DI
 from models import BEO, BEOPage, Annotation
 
 app = FastAPI(title="Catering Workflow API - Database Edition")
-
-# CORS middleware - allow all Render.com origins and localhost
+# CORS middleware - allow all origins (can restrict later with specific domains)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.onrender\.com$",  # All Render.com subdomains
-    allow_origins=[
-        "http://localhost:3000",
-        "http://192.168.1.100:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for now
+    allow_credentials=False,  # Must be False when allow_origins is "*"
     allow_methods=["*"],
     allow_headers=["*"],
 )
