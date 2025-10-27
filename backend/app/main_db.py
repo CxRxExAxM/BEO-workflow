@@ -35,8 +35,17 @@ app.add_middleware(
 # Add OPTIONS handler for all routes to handle CORS preflight
 @app.options("/{full_path:path}")
 async def options_handler():
-    """Handle CORS preflight requests"""
-    return JSONResponse(content={}, status_code=200)
+    """Handle CORS preflight requests with proper CORS headers"""
+    return JSONResponse(
+        content={},
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "600",
+        }
+    )
 
 
 # Initialize database on startup
