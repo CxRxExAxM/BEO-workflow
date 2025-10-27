@@ -20,6 +20,7 @@ from database import get_db, init_db, THUMBNAILS_DIR, HIGH_RES_DIR, ORIGINALS_DI
 from models import BEO, BEOPage, Annotation
 
 app = FastAPI(title="Catering Workflow API - Database Edition")
+
 # CORS middleware - allow all origins (can restrict later with specific domains)
 app.add_middleware(
     CORSMiddleware,
@@ -27,7 +28,15 @@ app.add_middleware(
     allow_credentials=False,  # Must be False when allow_origins is "*"
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+
+# Add OPTIONS handler for all routes to handle CORS preflight
+@app.options("/{full_path:path}")
+async def options_handler():
+    """Handle CORS preflight requests"""
+    return JSONResponse(content={}, status_code=200)
 
 
 # Initialize database on startup
